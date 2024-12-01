@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:convert'; // Base64 인코딩 및 디코딩을 위한 패키지
 import 'signup_page.dart'; // 회원가입 페이지 가져오기
+import 'qr_display_page.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -31,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       // Step 1: Login 컬렉션에서 ID에 해당하는 문서 가져오기
       DocumentSnapshot userDoc =
-          await _firestore.collection('Login').doc(id).get();
+          await _firestore.collection('login').doc(id).get();
 
       if (!userDoc.exists) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -49,33 +50,12 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // Step 2: name과 store 값 가져오기
+      // Step 2: workers 컬렉션에서 name 필드와 일치하는 문서 검색
       String userName = userData['name'];
-      String userStore = userData['store'];
 
-      // Step 3: Stores 컬렉션에서 store 필드와 일치하는 문서 검색
-      QuerySnapshot storeQuery = await _firestore.collection('Stores').get();
-      DocumentSnapshot? targetStoreDoc;
-
-      for (var doc in storeQuery.docs) {
-        Map<String, dynamic> storeData = doc.data() as Map<String, dynamic>;
-        if (storeData['점포명'] == userStore) {
-          targetStoreDoc = doc;
-          break;
-        }
-      }
-
-      if (targetStoreDoc == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('점포 정보를 찾을 수 없습니다.')),
-        );
-        return;
-      }
-
-      // Step 4: Workers 컬렉션에서 name과 일치하는 문서 검색
-      QuerySnapshot workersQuery = await targetStoreDoc.reference
-          .collection('Workers')
-          .where('이름', isEqualTo: userName)
+      QuerySnapshot workersQuery = await _firestore
+          .collection('workers')
+          .where('name', isEqualTo: userName)
           .get();
 
       if (workersQuery.docs.isEmpty) {
@@ -85,15 +65,17 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // Step 5: qr_img_base64 값 가져오기
+      // Step 3: qr_img_base64 값 가져오기
       Map<String, dynamic> workerData =
           workersQuery.docs.first.data() as Map<String, dynamic>;
-      setState(() {
-        qrImageBase64 = workerData['qr_img_base64'];
-      });
+      String qrImageBase64 = workerData['qr_img_base64'];
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('로그인 성공!')),
+      // QR 코드 화면으로 이동
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => QRDisplayPage(qrImageBase64: qrImageBase64),
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,36 +88,88 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('로그인'),
+        title: Text(''),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            TextField(
-              controller: _idController,
-              decoration: InputDecoration(labelText: 'ID'),
+            Container(
+              width: 250, // 원하는 너비로 설정
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Login',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 25,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  TextField(
+                    controller: _idController,
+                    decoration: InputDecoration(labelText: '사용자 이름'),
+                  ),
+                  SizedBox(height: 20),
+                  TextField(
+                    controller: _pwdController,
+                    decoration: InputDecoration(labelText: '비밀번호'),
+                    obscureText: true,
+                  ),
+                ],
+              ),
             ),
-            TextField(
-              controller: _pwdController,
-              decoration: InputDecoration(labelText: '비밀번호'),
-              obscureText: true,
+            SizedBox(height: 35),
+            Container(
+              width: 200,
+              child: ElevatedButton(
+                onPressed: login,
+                child: Text(
+                  '로그인',
+                  style: TextStyle(color: Colors.white),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color.fromARGB(255, 231, 109, 109),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.0),
+                  ),
+                ),
+              ),
             ),
-            SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: login,
-              child: Text('로그인'),
-            ),
-            TextButton(
-              onPressed: () {
-                // 회원가입 페이지로 이동
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => SignUpPage()),
-                );
-              },
-              child: Text('회원가입'),
+            SizedBox(height: 10), // 버튼과 간격 조정
+            Container(
+              width: 280,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: [
+                  TextButton(
+                    onPressed: () {
+                      // 아이디/비밀번호 찾기 로직 추가 가능
+                    },
+                    child: Text(
+                      '아이디/비밀번호 찾기',
+                      style: TextStyle(
+                        color: const Color.fromARGB(255, 175, 174, 174),
+                      ),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // 회원가입 페이지로 이동
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SignUpPage()),
+                      );
+                    },
+                    child: Text(
+                      '회원가입',
+                      style: TextStyle(color: Colors.blue),
+                    ),
+                  )
+                ],
+              ),
             ),
             SizedBox(height: 20),
             if (qrImageBase64 != null)
