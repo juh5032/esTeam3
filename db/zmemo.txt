@@ -1,0 +1,32 @@
+date_gen.py
+
+    firestore의 Schedules는 일 별로 저장한 다음 앱에서 필요로 하는 상황에 따라 
+    필요한 만큼 (한달 단위?)로 업데이트 하기로 했어서 
+    Schedules는 넉넉하게 2024-01-01부터 2030-12-31 까지 일 별 문서 "생성" 만 해 두었음.
+    
+    Schedules -> 2024-01-01, 2024-01-02, ..... 2024-12-31
+    
+    이때 문서 엄청 많이 생성하기 위해  임시적으로 사용한 함수라 앞으로 딱히 사용할 일은 없을듯.
+
+
+
+
+modify_Schedules_by_workers.py
+    
+    Workers -> worker1, worker2, ... 등 문서로 이루어짐.
+
+    worker1 등 문서는 이름/성별/나이 필드 + 근무시간 컬렉션으로 이루어짐.
+
+    근무시간 컬렉션은 monday/tuesday/wednesday/thursday/friday/saturday/sunday 7개의 문서로 이루어짐.
+
+    각 문서에는 출근 / 퇴근 필드로 이루어져 있음.
+
+    modify_Schedules_by_workers는 계속 "Workers" 컬렉션을 리스닝하고 있다가, 
+    새로운 worker 문서가 추가되거나, 삭제되거나(아마 앱에서 알바생 추가/삭제하는 경우 db가 갱신되는 상황에 해당할 듯), 기존 worker 문서가 수정되는 경우 
+    Schedules의 현재 날짜가 있는 "월"에 한해서 근무 일정 갱신
+
+
+app 폴더
+
+    그냥 웹 띄울때 필요한거 정리해둔거. flask 웹서버 내용이고 이거랑 별개로 백그라운드에서 modify_Schedules_by_workers.py 돌려야해서 따로 빼고 run.py로 개별실행 
+    

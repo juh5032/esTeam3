@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Device Status</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script> <!-- MQTT 라이브러리 -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='device.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='qrcode.css') }}">
+</head>
+<body>
+  <h1>Device Status</h1>
+  <div id="devices" class="device-container"></div>
+
+
+
+  <div class="qr-button-container">
+    <button onclick="startQRDetection('checkin')">출근하기</button>
+    <button onclick="startQRDetection('checkout')">퇴근하기</button>
+  </div>
+
+
+
+  <script>
+    // Firebase 설정 정보
+    const firebaseConfig = {
+      apiKey: "AIzaSyBvlFO9da2oRhLJcM-TSD7rwn36THjmysY",
+      authDomain: "raspteam333.firebaseapp.com",
+      projectId: "raspteam333",
+      storageBucket: "raspteam333.firebasestorage.app",
+      messagingSenderId: "632873205786",
+      appId: "1:632873205786:web:51388ba04db8e46f3a91a3"
+    };
+
+    // Firebase 초기화
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // MQTT 클라이언트 설정 (HiveMQ 브로커 사용)
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+
+    client.on('connect', () => {
+      console.log('Connected to HiveMQ Broker');
+    });
+
+    client.on('error', (error) => {
+      console.error('MQTT Connection Error:', error);
+    });
+
+
+    // Devices 컬렉션 리스너 추가
+    const devicesRef = db.collection('gpio');
+    devicesRef.onSnapshot((snapshot) => {
+      const devicesDiv = document.getElementById('devices');
+      devicesDiv.innerHTML = ''; // 기존 내용을 초기화
+
+      snapshot.forEach((doc) => {
+        const device = doc.data();
+        const deviceId = doc.id;
+        const deviceName = device["name"]; // 장치명 가져오기
+        const deviceElement = document.createElement('div');
+        deviceElement.className = 'device-box';
+        deviceElement.innerHTML = `
+          <img src="{{ url_for('static', filename='images/device.jpg') }}" alt="${deviceName}">
+          <h2>${deviceName}</h2>
+          <p class="status">Status: ${device.state.charAt(0).toUpperCase() + device.state.slice(1)}</p>
+          <div class="button-container">
+            <button class="btn-toggle" onclick="sendMQTTMessage('${deviceName}')">Toggle State</button>
+          </div>
+        `;
+        devicesDiv.appendChild(deviceElement);
+      });
+    });
+
+
+
+
+    // MQTT 메시지 전송 함수
+    function sendMQTTMessage(deviceName) {
+      const topic = `ESTeam3/control`; // MQTT 주제
+      const payload = deviceName; // 장치명을 payload로 설정
+      client.publish(topic, payload, { qos: 1 }, (error) => {
+        if (error) {
+          console.error('Failed to publish message:', error);
+        } else {
+          console.log(`Published to ${topic}:`, payload);
+        }
+      });
+    }
+
+
+
+
+  //QR 감지를 위해 웹에서 카메라 열도록 qr_detect.py로 신호보냄.
+ function startQRDetection(mode) {
+  // 서버에 POST 요청 보내기 (출근/퇴근 모드 전달)
+  fetch(`/start-qr-detection?mode=${mode}`, {
+    method: 'POST',
+  })
+    .then((response) => response.json()) // JSON 응답 파싱
+    .then((data) => {
+      if (data.status === 'success') {
+        const modeText = mode === 'checkin' ? '출근' : '퇴근';
+        showMessage(`${modeText} 완료 - ${data.message}`, 'success');
+      } else {
+        showMessage('QR 스캔 실패. 다시 시도하세요.', 'error');
+      }
+    })
+    .catch((error) => {
+      console.error('에러 발생:', error);
+      showMessage('서버와 통신 중 오류가 발생했습니다.', 'error');
+    });
+  }
+
+  function showMessage(message,type){
+    // 메시지 박스 생성
+    const messageBox = document.createElement('div');
+    messageBox.className = `message-box ${type}`; // 메시지 유형에 따라 스타일 설정
+    messageBox.innerText = message;
+
+    // 메시지 박스를 화면에 추가
+    document.body.appendChild(messageBox);
+
+    // 10초 후 메시지 박스 제거
+    setTimeout(() => {
+      messageBox.remove();
+    }, 10000);
+  }
+
+  </script>
+</body>
+</html>
